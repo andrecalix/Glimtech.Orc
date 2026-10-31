@@ -15,13 +15,16 @@
         .print-only { display: none; }
     </style>
 </head>
-<body class="bg-gray-100 p-4 font-sans">
+<body class="bg-gray-100 p-4 font-sans" onload="iniciarSistema()">
 
-    <!-- Interface de Preenchimento (Oculta na impressão) -->
+    <!-- Interface de Preenchimento -->
     <div class="no-print max-w-4xl mx-auto bg-white p-6 rounded shadow mb-10">
+        <div id="alerta-atualizacao" class="hidden mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 font-bold">
+            ⚠️ ATENÇÃO: A tabela de preços não é atualizada há mais de 7 dias! Atualize os valores no sistema.
+        </div>
+
         <h2 class="text-2xl font-bold mb-6 text-[#1b263b] border-b pb-2">Gerador de Orçamento Glimtech</h2>
         
-        <!-- Dados do Cliente -->
         <h3 class="font-bold text-lg mb-2 text-[#0096c7]">1. Dados do Cliente</h3>
         <div class="grid grid-cols-2 gap-4 mb-6">
             <div>
@@ -34,7 +37,6 @@
             </div>
         </div>
 
-        <!-- Lista de Materiais e Serviços -->
         <h3 class="font-bold text-lg mb-2 text-[#0096c7]">2. Serviços e Materiais</h3>
         <div class="bg-gray-50 p-4 rounded border mb-4">
             <div class="grid grid-cols-12 gap-2 mb-2">
@@ -44,12 +46,13 @@
                 <div class="col-span-2"><label class="block text-sm font-bold text-right">Valor Unit. (R$)</label></div>
             </div>
             
-            <div id="lista-itens" class="space-y-2 mb-4">
-                <!-- Os itens adicionados aparecerão aqui -->
-            </div>
+            <div id="lista-itens" class="space-y-2 mb-4"></div>
 
             <div class="grid grid-cols-12 gap-2 mt-4 pt-4 border-t">
-                <div class="col-span-6"><input type="text" id="novo-desc" class="border p-2 w-full rounded" placeholder="Ex: Cabo 2.5mm"></div>
+                <div class="col-span-6">
+                    <input type="text" id="novo-desc" list="lista-sugestoes" class="border p-2 w-full rounded" placeholder="Busque ou digite..." oninput="buscarPrecoAutomatico()">
+                    <datalist id="lista-sugestoes"></datalist>
+                </div>
                 <div class="col-span-2"><input type="text" id="novo-un" class="border p-2 w-full rounded text-center" value="UN"></div>
                 <div class="col-span-2"><input type="number" id="novo-qtd" class="border p-2 w-full rounded text-center" value="1"></div>
                 <div class="col-span-2"><input type="number" id="novo-valor" class="border p-2 w-full rounded text-right" placeholder="0.00"></div>
@@ -59,7 +62,6 @@
             </button>
         </div>
 
-        <!-- Custos Extras e Descontos -->
         <h3 class="font-bold text-lg mb-2 text-[#0096c7]">3. Fechamento</h3>
         <div class="grid grid-cols-2 gap-4 mb-6">
             <div>
@@ -77,10 +79,8 @@
         </button>
     </div>
 
-    <!-- Documento Final (Visível apenas na impressão - Formato A4) -->
+    <!-- Documento Final para Impressão -->
     <div class="print-only bg-white mx-auto w-[210mm] min-h-[297mm] relative pb-10">
-        
-        <!-- Cabeçalho -->
         <header class="bg-[#1b263b] text-white p-8 border-b-4 border-[#0096c7] flex justify-between items-center">
             <div>
                 <h1 class="text-3xl font-bold tracking-wider m-0">GLIMTECH</h1>
@@ -92,14 +92,12 @@
         </header>
 
         <div class="p-10">
-            <!-- Info do Cliente -->
             <div class="mb-6 pb-4 border-b border-gray-200">
                 <h2 class="text-[#0096c7] text-xl font-bold uppercase mb-2">Orçamento de Serviços</h2>
                 <p class="text-gray-700 text-sm"><strong>Cliente:</strong> <span id="print-cliente-nome">Não informado</span></p>
                 <p class="text-gray-700 text-sm"><strong>Contato:</strong> <span id="print-cliente-tel">Não informado</span></p>
             </div>
             
-            <!-- Tabela de Itens -->
             <table class="w-full mb-8 text-sm border-collapse">
                 <thead>
                     <tr class="bg-[#1b263b] text-white">
@@ -109,15 +107,10 @@
                         <th class="p-3 text-right w-1/6">TOTAL (R$)</th>
                     </tr>
                 </thead>
-                <tbody id="print-tabela-corpo">
-                    <!-- Linhas injetadas via JavaScript -->
-                </tbody>
-                <tfoot id="print-tabela-deslocamento">
-                    <!-- Linha de deslocamento injetada aqui se for maior que zero -->
-                </tfoot>
+                <tbody id="print-tabela-corpo"></tbody>
+                <tfoot id="print-tabela-deslocamento"></tfoot>
             </table>
 
-            <!-- Blocos de Totais -->
             <div class="space-y-3 mt-10">
                 <div class="bg-[#1b263b] text-white p-4 flex justify-between items-center font-bold text-lg rounded-sm">
                     <span>SUB TOTAL</span>
@@ -132,16 +125,58 @@
                     <span id="print-completa">R$ 0.00</span>
                 </div>
             </div>
-
-            <!-- Rodapé / Garantia -->
-            <div class="mt-12 pt-6 border-t border-gray-200 text-xs text-gray-500 text-justify">
-                <strong>GARANTIA E CONDIÇÕES:</strong> Os serviços prestados possuem garantia conforme legislação vigente. A opção completa inclui margem de segurança para imprevistos estruturais e materiais de acabamento premium. Valores sujeitos a alteração caso haja mudança no escopo do projeto inicial.
-            </div>
         </div>
     </div>
 
     <script>
-        let itens = [];
+        // CONFIGURAÇÕES DO BANCO DE DADOS E ATUALIZAÇÃO
+        // Altere a data abaixo toda vez que atualizar os preços (Formato: ANO-MES-DIA)
+        const dataUltimaAtualizacao = "2026-10-31"; 
+
+        // Adicione ou altere seus materiais e serviços aqui
+        const bancoDeDados = [
+            { desc: "Cabo Flexível 2,5mm", un: "M", valor: 3.50 },
+            { desc: "Cabo Flexível 4,0mm", un: "M", valor: 5.80 },
+            { desc: "Cabo Flexível 6,0mm", un: "M", valor: 8.50 },
+            { desc: "Tomada Dupla 10A Padrão", un: "UN", valor: 18.00 },
+            { desc: "Disjuntor Bipolar 20A", un: "UN", valor: 45.00 },
+            { desc: "Mão de Obra - Instalação de Tomada", un: "UN", valor: 60.00 },
+            { desc: "Mão de Obra - Ponto de Iluminação", un: "UN", valor: 80.00 },
+            { desc: "Quadro de Distribuição 12 a 16 Dj", un: "UN", valor: 120.00 }
+        ];
+
+        let itensOrcamento = [];
+
+        function iniciarSistema() {
+            // 1. Verificar data de atualização
+            const hoje = new Date();
+            const dataAtualizacao = new Date(dataUltimaAtualizacao);
+            const diffDias = Math.ceil(Math.abs(hoje - dataAtualizacao) / (1000 * 60 * 60 * 24));
+            
+            if (diffDias > 7) {
+                document.getElementById('alerta-atualizacao').classList.remove('hidden');
+            }
+
+            // 2. Preencher a lista de sugestões para autocompletar
+            const datalist = document.getElementById('lista-sugestoes');
+            bancoDeDados.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.desc;
+                datalist.appendChild(option);
+            });
+
+            atualizarTela();
+        }
+
+        function buscarPrecoAutomatico() {
+            const descDigitada = document.getElementById('novo-desc').value.toLowerCase();
+            const itemEncontrado = bancoDeDados.find(item => item.desc.toLowerCase() === descDigitada);
+            
+            if (itemEncontrado) {
+                document.getElementById('novo-un').value = itemEncontrado.un;
+                document.getElementById('novo-valor').value = itemEncontrado.valor;
+            }
+        }
 
         function formatarMoeda(valor) {
             return 'R$ ' + parseFloat(valor).toFixed(2).replace('.', ',');
@@ -154,13 +189,12 @@
             const valor = Number(document.getElementById('novo-valor').value);
 
             if (!desc || valor <= 0 || qtd <= 0) {
-                alert("Preencha a descrição e o valor corretamente.");
+                alert("Preencha a descrição e o valor unitário corretamente.");
                 return;
             }
 
-            itens.push({ id: Date.now(), desc, un, qtd, valor });
+            itensOrcamento.push({ id: Date.now(), desc, un, qtd, valor });
             
-            // Limpar campos
             document.getElementById('novo-desc').value = '';
             document.getElementById('novo-valor').value = '';
             document.getElementById('novo-qtd').value = '1';
@@ -170,21 +204,18 @@
         }
 
         function removerItem(id) {
-            itens = itens.filter(item => item.id !== id);
+            itensOrcamento = itensOrcamento.filter(item => item.id !== id);
             atualizarTela();
         }
 
         function atualizarTela() {
-            // 1. Atualizar Tabela na Interface (Visualização do Usuário)
             const listaHTML = document.getElementById('lista-itens');
             listaHTML.innerHTML = '';
-            
             let totalItens = 0;
 
-            itens.forEach(item => {
+            itensOrcamento.forEach(item => {
                 const totalLinha = item.qtd * item.valor;
                 totalItens += totalLinha;
-
                 listaHTML.innerHTML += `
                     <div class="grid grid-cols-12 gap-2 items-center bg-white p-2 rounded border">
                         <div class="col-span-6 text-sm">${item.desc}</div>
@@ -198,25 +229,18 @@
                 `;
             });
 
-            // 2. Capturar variáveis gerais
             const deslocamento = Number(document.getElementById('input-deslocamento').value) || 0;
             const descontoPerc = Number(document.getElementById('input-desconto').value) || 0;
-            const nomeCliente = document.getElementById('input-cliente-nome').value || 'Não informado';
-            const telCliente = document.getElementById('input-cliente-tel').value || 'Não informado';
-
             const subtotal = totalItens + deslocamento;
             const descontoValor = subtotal * (descontoPerc / 100);
-            const opcaoEconomica = subtotal - descontoValor;
-            const opcaoCompleta = subtotal * 1.15; // 15% extra padrão
 
-            // 3. Injetar dados no Documento de Impressão (PDF)
-            document.getElementById('print-cliente-nome').innerText = nomeCliente;
-            document.getElementById('print-cliente-tel').innerText = telCliente;
+            // Injetar dados no PDF
+            document.getElementById('print-cliente-nome').innerText = document.getElementById('input-cliente-nome').value || 'Não informado';
+            document.getElementById('print-cliente-tel').innerText = document.getElementById('input-cliente-tel').value || 'Não informado';
 
-            // Injetar linhas na tabela de impressão
             const tabelaCorpo = document.getElementById('print-tabela-corpo');
             tabelaCorpo.innerHTML = '';
-            itens.forEach((item, index) => {
+            itensOrcamento.forEach((item, index) => {
                 const bgClass = index % 2 === 0 ? 'bg-[#f8f9fa]' : 'bg-white';
                 tabelaCorpo.innerHTML += `
                     <tr class="${bgClass} border-b border-gray-200">
@@ -228,30 +252,21 @@
                 `;
             });
 
-            // Injetar linha de deslocamento no PDF se existir
             const tabelaDesloc = document.getElementById('print-tabela-deslocamento');
             if (deslocamento > 0) {
                 tabelaDesloc.innerHTML = `
                     <tr class="bg-gray-100 border-b-2 border-gray-300">
-                        <td class="p-3 font-bold text-gray-700">Taxa de Deslocamento / Logística</td>
-                        <td class="p-3 text-center">-</td>
-                        <td class="p-3 text-center">-</td>
+                        <td class="p-3 font-bold text-gray-700">Taxa de Deslocamento</td>
+                        <td class="p-3 text-center">-</td><td class="p-3 text-center">-</td>
                         <td class="p-3 text-right font-bold text-gray-700">${formatarMoeda(deslocamento)}</td>
-                    </tr>
-                `;
-            } else {
-                tabelaDesloc.innerHTML = '';
-            }
+                    </tr>`;
+            } else { tabelaDesloc.innerHTML = ''; }
 
-            // Atualiza valores finais
             document.getElementById('print-subtotal').innerText = formatarMoeda(subtotal);
-            document.getElementById('print-economica').innerText = formatarMoeda(opcaoEconomica);
+            document.getElementById('print-economica').innerText = formatarMoeda(subtotal - descontoValor);
             document.getElementById('print-desc-label').innerText = `(-${descontoPerc}%)`;
-            document.getElementById('print-completa').innerText = formatarMoeda(opcaoCompleta);
+            document.getElementById('print-completa').innerText = formatarMoeda(subtotal * 1.15);
         }
-
-        // Inicializar tela vazia
-        atualizarTela();
     </script>
 </body>
 </html>
